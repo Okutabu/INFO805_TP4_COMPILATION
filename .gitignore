@@ -1,0 +1,7 @@
+.idea
+.gradle
+bin/
+build/
+gradle/
+src/main/generated-cup/
+src/main/generated-jflex/

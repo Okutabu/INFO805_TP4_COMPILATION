@@ -1,0 +1,110 @@
+plugins {
+    id 'java'
+    id 'idea'
+}
+
+configurations {
+    cupGeneration
+    jflexGeneration
+}
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+dependencies {
+    jflexGeneration 'de.jflex:jflex:1.6.1'
+    cupGeneration 'com.github.vbmacher:java-cup:11b-20151001'
+    implementation 'com.github.vbmacher:java-cup-runtime:11b-20151001'
+}
+
+task jflex (group: 'build') {
+    ext.source = fileTree ( 'src/main/jflex'){
+        include "**/*.jflex"
+        include "**/*.flex"
+    }
+    ext.destdir = file("src/main/generated-jflex")
+    ext.noback = 'true'
+    ext.verbose = 'on'
+
+    inputs.property('noback', jflex.noback)
+    inputs.files(jflex.source)
+    outputs.dir(jflex.destdir)
+
+    ant.taskdef(name:'jflex', classpath:configurations.jflexGeneration.asPath,  classname:"jflex.anttask.JFlexTask")
+    doLast {
+        sourceSets.main.java.srcDir jflex.destdir
+        source.each { File f ->
+            println "jflex source --> ${f}"
+            ant.jflex(file:f, destdir:destdir, nobak:noback, verbose:verbose)
+        }
+    }
+}
+
+task cup (group: 'build') {
+    ext.source = fileTree ('src/main/cup'){
+        include "**/*.cup"
+    }
+    ext.destdir = file("src/main/generated-cup")
+    ext.force = 'true'
+    ext.dump = 'off'
+    ext.locations = 'false'
+
+    inputs.property('locations', cup.locations)
+    inputs.files(cup.source)
+    outputs.dir(cup.destdir)
+
+    ant.taskdef(name:'cup', classpath:configurations.cupGeneration.asPath,  classname:"java_cup.anttask.CUPTask")
+    doLast {
+        sourceSets.main.java.srcDir cup.destdir
+        source.each { File f ->
+            println "cup source --> ${f}"
+            ant.cup(srcfile:f, destdir:destdir, force:force, dump:dump, locations:locations)
+        }
+    }
+}
+
+clean.doFirst {
+    delete jflex.destdir
+    delete cup.destdir
+}
+
+compileJava.dependsOn cup, jflex
+
+jar {
+    from {
+        configurations.compileClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+    manifest {
+        attributes  'Main-Class': 'fr.info805.Main'
+    }
+}
+
+task ide {
+    ideaModule.dependsOn ide
+    doFirst {
+        mkdir jflex.destdir
+        mkdir cup.destdir
+    }
+}
+
+idea {
+    module {
+        generatedSourceDirs += cup.destdir
+        generatedSourceDirs += jflex.destdir
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            sourceCompatibility = 1.8
+            targetCompatibility = 1.8
+            srcDir cup.destdir
+            srcDir jflex.destdir
+        }
+    }
+}
